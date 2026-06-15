@@ -12,12 +12,14 @@ from deepface import DeepFace
 app = Flask(__name__)
 CORS(app)
 
-# Load crime data
-data = pd.read_csv("C:/Users/IP5/Downloads/SAF/New folder/backend/crime_data.csv")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+data = pd.read_csv(os.path.join(BASE_DIR, "crime_data.csv"))
 
 # Load TFLite model
 def load_tflite_model():
-    interpreter = tf.lite.Interpreter(model_path="C:/Users/IP5/Downloads/SAF/New folder/backend/crime_model.tflite")
+    interpreter = tf.lite.Interpreter(
+    model_path=os.path.join(BASE_DIR, "crime_model.tflite"))
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
@@ -26,7 +28,7 @@ def load_tflite_model():
 interpreter, input_details, output_details = load_tflite_model()
 
 # Load Scaler
-SCALER_PATH = "C:/Users/IP5/Downloads/SAF/New folder/backend/scaler.pkl"
+SCALER_PATH = os.path.join(BASE_DIR, "scaler.pkl")
 
 # Predict safety score using TFLite model
 def predict_safety_score(interpreter, lat, lon, murder, rape, robbery):
@@ -216,4 +218,4 @@ def analyze_route(route_id):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
