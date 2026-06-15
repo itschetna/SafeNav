@@ -1,12 +1,10 @@
-tensorflow==2.15.0
 Flask
 flask-cors
 gunicorn
 pandas
 numpy
 scikit-learn
-tf-keras
+tensorflow
 joblib
 geopy
 requests
-deepface
