@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 import joblib
 import os
-from deepface import DeepFace
+# from deepface import DeepFace   # Temporarily disabled for Render deployment
 
 app = Flask(__name__)
 CORS(app)
@@ -16,10 +16,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 data = pd.read_csv(os.path.join(BASE_DIR, "crime_data.csv"))
 
-# Load TFLite model
 def load_tflite_model():
     interpreter = tf.lite.Interpreter(
-    model_path=os.path.join(BASE_DIR, "crime_model.tflite"))
+        model_path=os.path.join(BASE_DIR, "crime_model.tflite")
+    )
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
@@ -27,10 +27,8 @@ def load_tflite_model():
 
 interpreter, input_details, output_details = load_tflite_model()
 
-# Load Scaler
 SCALER_PATH = os.path.join(BASE_DIR, "scaler.pkl")
 
-# Predict safety score using TFLite model
 def predict_safety_score(interpreter, lat, lon, murder, rape, robbery):
     try:
         scaler = joblib.load(SCALER_PATH)
@@ -50,7 +48,6 @@ def predict_safety_score(interpreter, lat, lon, murder, rape, robbery):
         print(f"Error during prediction: {e}")
         return None
 
-# Get nearest crime stats from dataset for a location
 def find_nearest_crime_stats(lat, lon, data, radius=0.01):
     filtered = data[
         (abs(data["Latitude"] - lat) <= radius) &
@@ -61,24 +58,29 @@ def find_nearest_crime_stats(lat, lon, data, radius=0.01):
         rape = filtered["Rape"].mean()
         robbery = filtered["Robbery"].mean()
         return murder, rape, robbery
-    else:
-        return 0, 0, 0
+    return 0, 0, 0
 
-# Calculate safety score for each route
 def calculate_safety_score(route):
     total_score = 0
     valid_points = 0
+
     for lat, lon in route:
         murder, rape, robbery = find_nearest_crime_stats(lat, lon, data)
         score = predict_safety_score(interpreter, lat, lon, murder, rape, robbery)
+
         if score is not None:
             total_score += score
             valid_points += 1
+
     return total_score / valid_points if valid_points else 0
 
-# Get routes from OSRM API
 def get_routes(start, end):
-    api_url = f"https://router.project-osrm.org/route/v1/driving/{start[1]},{start[0]};{end[1]},{end[0]}?overview=full&geometries=geojson&alternatives=true"
+    api_url = (
+        f"https://router.project-osrm.org/route/v1/driving/"
+        f"{start[1]},{start[0]};{end[1]},{end[0]}"
+        f"?overview=full&geometries=geojson&alternatives=true"
+    )
+
     response = requests.get(api_url).json()
 
     routes = []
@@ -98,6 +100,7 @@ def get_routes(start, end):
                 "duration": duration,
                 "id": f"route_{idx+1}"
             })
+
     return routes
 
 @app.route('/')
@@ -118,6 +121,7 @@ def get_safe_routes():
         end_coords = (end['lat'], end['lng'])
 
         routes = get_routes(start_coords, end_coords)
+
         if not routes:
             return jsonify({'error': 'No routes found'}), 404
 
@@ -137,6 +141,7 @@ def get_safe_routes():
                 for route in routes
             ]
         }
+
         return jsonify(response), 200
 
     except Exception as e:
@@ -145,12 +150,20 @@ def get_safe_routes():
 @app.route('/api/autocomplete', methods=['GET'])
 def autocomplete():
     query = request.args.get('q', '')
+
     if not query:
         return jsonify([])
 
     geolocator = Nominatim(user_agent="safenav-autocomplete")
+
     try:
-        results = geolocator.geocode(query, exactly_one=False, limit=5, addressdetails=True)
+        results = geolocator.geocode(
+            query,
+            exactly_one=False,
+            limit=5,
+            addressdetails=True
+        )
+
         suggestions = []
 
         if results:
@@ -160,7 +173,9 @@ def autocomplete():
                     'lat': result.latitude,
                     'lng': result.longitude
                 })
+
         return jsonify(suggestions)
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -171,50 +186,49 @@ def sos_alert():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# DeepFace analysis route
-@app.route('/api/analyze_route/<int:route_id>', methods=['GET'])
-def analyze_route(route_id):
-    try:
-        image_path = f"static/route_images/route_{route_id}.jpg"
 
-        if not os.path.exists(image_path):
-            return jsonify({"error": "Image not found"}), 404
-
-        try:
-            analysis = DeepFace.analyze(
-                img_path=image_path,
-                actions=["gender", "emotion"],
-                enforce_detection=False
-            )
-        except Exception as df_error:
-            return jsonify({"error": f"DeepFace failed: {str(df_error)}"}), 500
-
-        if not isinstance(analysis, list):
-            analysis = [analysis]
-
-        gender_count = {}
-        emotion_count = {}
-        total_faces = len(analysis)
-
-        for face in analysis:
-            gender = face.get("dominant_gender") or face.get("gender")
-            emotion = face.get("dominant_emotion") or face.get("emotion")
-
-            if gender:
-                gender_count[gender] = gender_count.get(gender, 0) + 1
-            if emotion:
-                emotion_count[emotion] = emotion_count.get(emotion, 0) + 1
-
-        return jsonify({
-            "total_faces": total_faces,
-            "gender_count": gender_count,
-            "emotion_count": emotion_count
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
+# DeepFace analysis route temporarily disabled for Render deployment
+# @app.route('/api/analyze_route/<int:route_id>', methods=['GET'])
+# def analyze_route(route_id):
+#     try:
+#         image_path = f"static/route_images/route_{route_id}.jpg"
+#
+#         if not os.path.exists(image_path):
+#             return jsonify({"error": "Image not found"}), 404
+#
+#         try:
+#             analysis = DeepFace.analyze(
+#                 img_path=image_path,
+#                 actions=["gender", "emotion"],
+#                 enforce_detection=False
+#             )
+#         except Exception as df_error:
+#             return jsonify({"error": f"DeepFace failed: {str(df_error)}"}), 500
+#
+#         if not isinstance(analysis, list):
+#             analysis = [analysis]
+#
+#         gender_count = {}
+#         emotion_count = {}
+#         total_faces = len(analysis)
+#
+#         for face in analysis:
+#             gender = face.get("dominant_gender") or face.get("gender")
+#             emotion = face.get("dominant_emotion") or face.get("emotion")
+#
+#             if gender:
+#                 gender_count[gender] = gender_count.get(gender, 0) + 1
+#             if emotion:
+#                 emotion_count[emotion] = emotion_count.get(emotion, 0) + 1
+#
+#         return jsonify({
+#             "total_faces": total_faces,
+#             "gender_count": gender_count,
+#             "emotion_count": emotion_count
+#         })
+#
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':
