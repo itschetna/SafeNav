@@ -1,0 +1,11 @@
+Flask
+flask-cors
+gunicorn
+pandas
+numpy
+scikit-learn
+tensorflow
+joblib
+geopy
+requests
+deepface
